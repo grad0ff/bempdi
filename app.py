@@ -29,9 +29,10 @@ async def select_port(ports):
     while True:
         for key, value in ports.items():
             print(f"{key}. {value}")
-        port_num = int(input("Выберите порт: "))
-        if port_num in ports.keys():
-            return ports.get(port_num)
+
+        port = input("Выберите порт: ")
+        if port.isnumeric() and int(port) in range(len(ports)):
+            return ports.get(int(port))
 
 
 async def get_client(port) -> ModbusSerialClient:
@@ -61,8 +62,8 @@ async def get_di_count(mb_client):
         print(f"Exeption: {e}")
 
 
-async def run_polling(mb_client):
-    di_status_list_old = [i for i in range(Bemp.di_count)]
+async def run_polling(mb_client, off_state_voicing):
+    di_status_list_old = [False for i in range(Bemp.di_count)]
     di_status_list_new = []
 
     while True:
@@ -72,23 +73,37 @@ async def run_polling(mb_client):
             print(f"Exeption: {e}")
 
         for i in range(Bemp.di_count):
-            if di_status_list_new[i] != di_status_list_old[i] & di_status_list_new[i]:
-                try:
-                    di_song = pygame.mixer.Sound(resource_path(f"resources/songs/Daria/di/{i + 1}.wav"))
-                    song_time = di_song.get_length() - 0.3
-                    di_song.play()
-                    time.sleep(song_time)
-                    if not di_status_list_new[i]:
-                        song_dio_state = pygame.mixer.Sound(
-                            resource_path(f"resources/songs/Daria/di/{i + 1}/on-off/отключено.wav"))
-                        song_time = song_dio_state.get_length() - 0.1
-                        song_dio_state.play()
+            if di_status_list_new[i] != di_status_list_old[i]:
+                if di_status_list_new[i] or (not di_status_list_new[i] and off_state_voicing):
+                    di_num = i + 1
+                    try:
+                        print(f"ДВ {di_num} - on")
+                        di_song = pygame.mixer.Sound(resource_path(f"resources/songs/Daria/di/{di_num}.wav"))
+                        song_time = di_song.get_length() - 0.3
+                        di_song.play()
                         time.sleep(song_time)
-                except Exception as e:
-                    print(f"Exeption: {e}")
+
+                        if not di_status_list_new[i]:
+                            print(f"ДВ {di_num} - off")
+                            song_dio_state = pygame.mixer.Sound(
+                                resource_path(f"resources/songs/Daria/on-off/отключено.wav"))
+                            song_time = song_dio_state.get_length() - 0.1
+                            song_dio_state.play()
+                            time.sleep(song_time)
+                    except Exception as e:
+                        print(f"Exeption: {e}")
 
         di_status_list_old = di_status_list_new.copy()
         await asyncio.sleep(1)
+
+
+async def get_off_state_voicing():
+    while True:
+        off_state_voicing = input("Озвучивать отключение ДВ? [1-Да / 0-Нет] ")
+        if off_state_voicing.isnumeric():
+            num = int(off_state_voicing)
+            if num in [0, 1]:
+                return bool(num)
 
 
 def resource_path(relative_path):
@@ -103,4 +118,5 @@ async def run():
     bemp_port = await select_port(ports)
     mb_client = await get_client(bemp_port)
     await get_di_count(mb_client)
-    await run_polling(mb_client)
+    off_state_voicing = await get_off_state_voicing()
+    await run_polling(mb_client, off_state_voicing)
