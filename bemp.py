@@ -1,6 +1,9 @@
 class Bemp:
-    def __init__(self):
-        self.speed = 38400
-        self.parity = "N"
-        self.stopbits = 1
-        self.address = "1"
+    method = "ASCII"
+    speed = 38400
+    bytesize = 8
+    parity = "N"
+    stopbits = 1
+    address = 1
+    di_start_address = 0x500
+    di_count = 96
