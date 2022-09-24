@@ -5,5 +5,6 @@ class Bemp:
     parity = "N"
     stopbits = 1
     address = 1
+    di_count_address = 0x100
     di_start_address = 0x500
     di_count = 96

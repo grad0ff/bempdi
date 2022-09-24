@@ -1,7 +1,7 @@
-import asyncio
 import os
 import sys
 import time
+from threading import Thread
 
 import pygame
 import serial.tools.list_ports
@@ -11,33 +11,34 @@ from pymodbus.exceptions import ConnectionException
 from bemp import Bemp
 
 
-async def find_ports():
-    """ Определяет список COM-портов или выводит инфо об ошибке их поиска """
+def find_ports():
+    """Возвращает перечень COM-портов в виде словаря"""
     while True:
         print("Поиск COM-портов...")
         ports = serial.tools.list_ports.comports()
         sorted_ports = sorted(list(map(lambda port: port.name, ports)))
-        # sorted_ports = ["COM1", "COM2", "COM3"]
         count = len(sorted_ports)
-        print(f"Найдено портов: {count}")
         if count > 0:
-            # return dict(zip([i for i in range(3)], sorted_ports))
+            print(f"Найдено портов: {count}")
             return dict(zip([i for i in range(count)], sorted_ports))
         time.sleep(3)
+        print("COM-порты не найдены...")
 
 
-async def select_port(ports):
+def select_port(ports):
+    """Возвращает имя выбранного COM-порта"""
     while True:
         for key, value in ports.items():
-            print(f"{key}. {value}")
-
-        port = input("Выберите порт: ")
+            print(f"{key} - {value}")
+        port = input(f"Введите число, соответствующее COM-порту БЭМП: ")
         if port.isnumeric() and int(port) in range(len(ports)):
-            return ports.get(int(port))
+            bemp_port = ports.get(int(port))
+            print(f"Выбран порт: {bemp_port}")
+            return bemp_port
 
 
-async def get_client(port):
-    """ Проверяет связь с устройством, возвращает модбас клиент """
+def get_mb_client(port):
+    """ Подключает к устройству, возвращает Modbus клиент """
     print(f'Проверка связи с БЭМП...')
     try:
         client = ModbusSerialClient(
@@ -53,32 +54,24 @@ async def get_client(port):
         elif client.is_socket_open():
             print("Устройство подключено")
             return client
-    except ConnectionException as ce:
-        print(f"Ошибка подключения. Возможно, порт {port} занят или недоступен")
+    except ConnectionException:
+        print(f"Ошибка подключения. Возможно, порт {port} занят или недоступен. Выход из программы")
         exit(1)
     except Exception as e:
         print(f"Exception: {e}")
 
 
-async def get_di_count(mb_client):
-    print("Чтение количества ДВ")
-    try:
-        Bemp.di_count = mb_client.read_holding_registers(0x0100, unit=Bemp.address).registers[0]
-        print(f"Количество ДВ: {Bemp.di_count}")
-    except Exception as e:
-        print(f"Exeption: {e}")
-
-
-async def run_polling(mb_client, off_state_voicing):
-    await get_di_count(mb_client)
-    di_status_list_old = [False for i in range(Bemp.di_count)]
+def run_polling(mb_client, off_state_voicing):
+    Bemp.di_count = get_di_count(mb_client)
+    di_status_list_old = [False for _ in range(Bemp.di_count)]
     di_status_list_new = []
 
     while True:
+        print("listen")
         try:
             di_status_list_new = mb_client.read_coils(Bemp.di_start_address, Bemp.di_count, unit=Bemp.address).bits
         except Exception as e:
-            print(f"Exeption: {e}")
+            print(f"Exception: {e}")
 
         for i in range(Bemp.di_count):
             if di_status_list_new[i] != di_status_list_old[i]:
@@ -99,20 +92,33 @@ async def run_polling(mb_client, off_state_voicing):
                             song_dio_state.play()
                             time.sleep(song_time)
                     except Exception as e:
-                        print(f"Exeption: {e}")
+                        print(f"Exception: {e}")
         di_status_list_old = di_status_list_new.copy()
-        await check_connect(mb_client)
-        await asyncio.sleep(0.5)
+        time.sleep(0.5)
 
 
-async def check_connect(mb_client):
-    if not mb_client.is_socket_open():
-        print("Соединение c устройством потеряно... ")
-        exit(1)
-    await asyncio.sleep(0.25)
+def get_di_count(mb_client):
+    print("Чтение количества ДВ в БЭМП...")
+    try:
+        di_count = mb_client.read_holding_registers(Bemp.di_count_address, unit=Bemp.address).registers[0]
+    except Exception as e:
+        print(f"Exception: {e}")
+    else:
+        print(f"Количество ДВ: {di_count}")
+        return di_count
 
 
-async def get_off_state_voicing():
+def check_connect(mb_client):
+    """Проверяет статус подключения к устройству"""
+    while True:
+        print("check")
+        if not mb_client.is_socket_open():
+            print("Соединение c устройством потеряно... Выход из программы")
+        time.sleep(1)
+
+
+def get_off_state_voicing():
+    """Возвращает флаг озвучивания при отключении ДВ"""
     while True:
         off_state_voicing = input("Озвучивать отключение ДВ? [1-Да / 0-Нет] ")
         if off_state_voicing.isnumeric():
@@ -127,10 +133,16 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 
-async def run():
+def run():
     pygame.init()
-    ports = await find_ports()
-    bemp_port = await select_port(ports)
-    mb_client = await get_client(bemp_port)
-    off_state_voicing = await get_off_state_voicing()
-    await run_polling(mb_client, off_state_voicing)
+    ports = find_ports()
+    bemp_port = select_port(ports)
+    mb_client = get_mb_client(bemp_port)
+    off_state_voicing = get_off_state_voicing()
+    tread1 = Thread(target=check_connect, args=(mb_client,), name="check_connect_thread")
+    tread2 = Thread(target=run_polling, args=(mb_client, off_state_voicing), name="polling_thread")
+    tread1.start()
+    tread2.start()
+    tread1.join()
+    tread2.join()
+    # run_polling(mb_client, off_state_voicing)
