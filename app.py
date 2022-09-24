@@ -6,6 +6,7 @@ import time
 import pygame
 import serial.tools.list_ports
 from pymodbus.client.sync import ModbusSerialClient
+from pymodbus.exceptions import ConnectionException
 
 from bemp import Bemp
 
@@ -22,7 +23,7 @@ async def find_ports():
         if count > 0:
             # return dict(zip([i for i in range(3)], sorted_ports))
             return dict(zip([i for i in range(count)], sorted_ports))
-        await asyncio.sleep(3)
+        time.sleep(3)
 
 
 async def select_port(ports):
@@ -35,7 +36,7 @@ async def select_port(ports):
             return ports.get(int(port))
 
 
-async def get_client(port) -> ModbusSerialClient:
+async def get_client(port):
     """ Проверяет связь с устройством, возвращает модбас клиент """
     print(f'Проверка связи с БЭМП...')
     try:
@@ -46,11 +47,17 @@ async def get_client(port) -> ModbusSerialClient:
             bytesize=Bemp.bytesize,
             parity=Bemp.parity,
             stopbits=Bemp.stopbits)
-        if client.connect() and client.is_socket_open():
+        client.connect()
+        if client.socket is None:
+            raise ConnectionException
+        elif client.is_socket_open():
             print("Устройство подключено")
             return client
+    except ConnectionException as ce:
+        print(f"Ошибка подключения. Возможно, порт {port} занят или недоступен")
+        exit(1)
     except Exception as e:
-        print(f"Exeption: {e}")
+        print(f"Exception: {e}")
 
 
 async def get_di_count(mb_client):
@@ -63,6 +70,7 @@ async def get_di_count(mb_client):
 
 
 async def run_polling(mb_client, off_state_voicing):
+    await get_di_count(mb_client)
     di_status_list_old = [False for i in range(Bemp.di_count)]
     di_status_list_new = []
 
@@ -92,9 +100,16 @@ async def run_polling(mb_client, off_state_voicing):
                             time.sleep(song_time)
                     except Exception as e:
                         print(f"Exeption: {e}")
-
         di_status_list_old = di_status_list_new.copy()
-        await asyncio.sleep(1)
+        await check_connect(mb_client)
+        await asyncio.sleep(0.5)
+
+
+async def check_connect(mb_client):
+    if not mb_client.is_socket_open():
+        print("Соединение c устройством потеряно... ")
+        exit(1)
+    await asyncio.sleep(0.25)
 
 
 async def get_off_state_voicing():
@@ -117,6 +132,5 @@ async def run():
     ports = await find_ports()
     bemp_port = await select_port(ports)
     mb_client = await get_client(bemp_port)
-    await get_di_count(mb_client)
     off_state_voicing = await get_off_state_voicing()
     await run_polling(mb_client, off_state_voicing)
