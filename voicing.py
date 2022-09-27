@@ -1,4 +1,4 @@
-speakers = {1: "Daria", 2: "Maksim"}
+speakers = {0: "Daria", 1: "Maksim"}
 
 
 def select_speaker():
@@ -6,10 +6,10 @@ def select_speaker():
     while True:
         for key, value in speakers.items():
             print(f"{key} - {value}")
-        speaker_num = input(f"Введите число, соответствующее спикеру: ")
+        speaker_num = input(f"Введите число, соответствующее спикеру [0-{len(speakers) - 1}]: ")
         if speaker_num.isnumeric() and int(speaker_num) in speakers.keys():
             speaker_num = speakers.get(int(speaker_num))
-            print(f"Выбран спикер: {speaker_num}")
+            print(f"Выбран спикер: {speaker_num}\n")
             return speaker_num
 
 

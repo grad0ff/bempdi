@@ -1,3 +1,5 @@
+import os
+
 import pygame
 
 import voicing
@@ -8,6 +10,7 @@ from polling import run_polling
 
 def run():
     pygame.init()
+    os.system("cls")
     bemp = Bemp()
     mb_client = get_mb_client(bemp)
     speaker, di_off_voicing = voicing.configure_voicing()

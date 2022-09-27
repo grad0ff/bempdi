@@ -14,7 +14,7 @@ def find_ports():
         sorted_ports = sorted(list(map(lambda port: port.name, ports)))
         count = len(sorted_ports)
         if count > 0:
-            print(f"Найдено портов: {count}")
+            print(f"Найдено портов: {count}\n")
             return dict(zip([i for i in range(count)], sorted_ports))
         time.sleep(3)
         print("COM-порты не найдены...")
@@ -25,15 +25,15 @@ def select_port(ports):
     while True:
         for key, value in ports.items():
             print(f"{key} - {value}")
-        port = input(f"Введите число, соответствующее COM-порту БЭМП: ")
+        port = input(f"Введите число, соответствующее COM-порту БЭМП [0-{len(ports)}]: ")
         if port.isnumeric() and int(port) in range(len(ports)):
             bemp_port = ports.get(int(port))
-            print(f"Выбран порт: {bemp_port}")
+            print(f"Выбран порт: {bemp_port}\n")
             return bemp_port
 
 
-def get_connect(port, device):
-    """ Подключает к устройству, возвращает Modbus клиент """
+def get_connect(device, port):
+    """Подключает к устройству, возвращает Modbus клиент"""
     print(f'Проверка связи с БЭМП...')
     try:
         client = ModbusSerialClient(
@@ -44,20 +44,21 @@ def get_connect(port, device):
             parity=device.parity,
             stopbits=device.stopbits)
         client.connect()
-        if client.socket is None:
+        if client.socket is None or not client.is_socket_open():
             raise ConnectionException
-        elif client.is_socket_open():
-            print("Устройство подключено")
-            return client
     except ConnectionException:
-        print(f"Ошибка подключения. Возможно, порт {port} занят или недоступен. Выход из программы")
+        print(f"Ошибка подключения. Возможно, порт {port} занят или недоступен.\n"
+              f"Выход из программы")
         sys.exit(1)
     except Exception as e:
         print(f"Exception: {e}")
+    else:
+        print("Устройство подключено\n")
+        return client
 
 
 def get_mb_client(device):
     ports = find_ports()
     bemp_port = select_port(ports)
-    mb_client = get_connect(bemp_port, device)
+    mb_client = get_connect(device, bemp_port)
     return mb_client
