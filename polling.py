@@ -25,18 +25,19 @@ def polling(device, mb_client, speaker, is_di_off_voicing):
                 try:
                     # если ДВ сработал или флаг озвучки отключения True
                     if state_list_new[i] or is_di_off_voicing:
-                        if state_list_new[i]:
-                            print(f"ДВ {di_num} - on")
                         di_song = pygame.mixer.Sound(resource_path(f"resources/songs/{speaker}/di/{di_num}.wav"))
                         song_time = di_song.get_length() - 0.2
                         di_song.play()
                         time.sleep(song_time)
-                        if not state_list_new[i] and is_di_off_voicing:
+                        if state_list_new[i]:
+                            print(f"ДВ {di_num} - on")
+                        else:
                             print(f"ДВ {di_num} - off")
-                            di_song = pygame.mixer.Sound(resource_path(f"resources/songs/{speaker}/on-off/off.wav"))
-                            song_time = di_song.get_length() - 0.1
-                            di_song.play()
-                            time.sleep(song_time)
+                            if is_di_off_voicing:
+                                di_song = pygame.mixer.Sound(resource_path(f"resources/songs/{speaker}/on-off/off.wav"))
+                                song_time = di_song.get_length() - 0.1
+                                di_song.play()
+                                time.sleep(song_time)
                 except Exception as e:
                     print(f"Exception: {e}")
         state_list_old = state_list_new.copy()
