@@ -59,7 +59,8 @@ def check_connect(mb_client):
     """Проверяет статус подключения к устройству"""
     while True:
         if not mb_client.is_socket_open():
-            print("Соединение c устройством потеряно... Выход из программы")
+            print("Соединение c устройством потеряно. Выход из программы...")
+            time.sleep(2)
             exit(1)
         time.sleep(0.25)
 

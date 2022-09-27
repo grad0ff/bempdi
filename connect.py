@@ -48,7 +48,8 @@ def get_connect(device, port):
             raise ConnectionException
     except ConnectionException:
         print(f"Ошибка подключения. Возможно, порт {port} занят или недоступен.\n"
-              f"Выход из программы")
+              f"Выход из программы...")
+        time.sleep(2)
         sys.exit(1)
     except Exception as e:
         print(f"Exception: {e}")
