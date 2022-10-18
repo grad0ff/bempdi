@@ -10,6 +10,7 @@ def select_speaker():
         if speaker_num.isnumeric() and int(speaker_num) in speakers.keys():
             speaker_num = speakers.get(int(speaker_num))
             print(f"Выбран спикер: {speaker_num}\n")
+
             return speaker_num
 
 

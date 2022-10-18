@@ -5,6 +5,8 @@ from threading import Thread
 
 import pygame
 
+from src.bempdi.log_manage import logger
+
 
 def polling(device, mb_client, speaker, is_di_off_voicing):
     """Обеспечивает опрос ДВ устройства"""
@@ -17,7 +19,8 @@ def polling(device, mb_client, speaker, is_di_off_voicing):
         try:
             state_list_new = mb_client.read_coils(device.di_start_address, device.di_count, unit=device.address).bits
         except Exception as e:
-            print(f"Exception: {e}")
+            logger.error(e)
+            sys.exit(1)
         for i in range(device.di_count):
             # если состояние ДВ изменилось
             if not is_first_request and state_list_new[i] != state_list_old[i]:
@@ -25,7 +28,7 @@ def polling(device, mb_client, speaker, is_di_off_voicing):
                 try:
                     # если ДВ сработал или флаг озвучки отключения True
                     if state_list_new[i] or is_di_off_voicing:
-                        di_song = pygame.mixer.Sound(resource_path(f"resources/songs/{speaker}/di/{di_num}.wav"))
+                        di_song = pygame.mixer.Sound(get_abs_path(f"../resources/songs/{speaker}/di/{di_num}.wav"))
                         song_time = di_song.get_length() - 0.2
                         di_song.play()
                         time.sleep(song_time)
@@ -34,12 +37,14 @@ def polling(device, mb_client, speaker, is_di_off_voicing):
                         else:
                             print(f"ДВ {di_num} - off")
                             if is_di_off_voicing:
-                                di_song = pygame.mixer.Sound(resource_path(f"resources/songs/{speaker}/on-off/off.wav"))
+                                di_song = pygame.mixer.Sound(
+                                    get_abs_path(f"../resources/songs/{speaker}/on-off/off.wav"))
                                 song_time = di_song.get_length() - 0.1
                                 di_song.play()
                                 time.sleep(song_time)
                 except Exception as e:
-                    print(f"Exception: {e}")
+                    logger.error(e)
+                    sys.exit(1)
         state_list_old = state_list_new.copy()
         is_first_request = False
         time.sleep(0.5)
@@ -50,7 +55,8 @@ def get_di_count(device, mb_client):
     try:
         di_count = mb_client.read_holding_registers(device.di_count_address, unit=device.address).registers[0]
     except Exception as e:
-        print(f"Exception: {e}")
+        logger.error(e)
+        sys.exit(1)
     else:
         return di_count
 
@@ -65,10 +71,10 @@ def check_connect(mb_client):
         time.sleep(0.25)
 
 
-def resource_path(relative_path):
+def get_abs_path(file_rel_path):
     """Возвращает путь для добавляемых в *.exe ресурсов (иконки, звуки и т.п.)"""
-    base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(base_path, relative_path)
+
+    return os.path.abspath(file_rel_path)
 
 
 def run_polling(device, mb_client, speaker, di_off_voicing):

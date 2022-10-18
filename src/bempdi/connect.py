@@ -5,6 +5,8 @@ import serial.tools.list_ports
 from pymodbus.client.sync import ModbusSerialClient
 from pymodbus.exceptions import ConnectionException
 
+from src.bempdi.log_manage import logger
+
 
 def find_ports():
     """Возвращает перечень COM-портов в виде словаря"""
@@ -17,7 +19,8 @@ def find_ports():
             print(f"Найдено портов: {count}\n")
             return dict(zip([i for i in range(count)], sorted_ports))
         time.sleep(3)
-        print("COM-порты не найдены...")
+        msg = "COM-порты не найдены..."
+        logger.warning(msg)
 
 
 def select_port(ports):
@@ -29,6 +32,8 @@ def select_port(ports):
         if port.isnumeric() and int(port) in range(len(ports)):
             bemp_port = ports.get(int(port))
             print(f"Выбран порт: {bemp_port}\n")
+            logger.info(bemp_port)
+
             return bemp_port
 
 
@@ -46,13 +51,15 @@ def get_connect(device, port):
         client.connect()
         if client.socket is None or not client.is_socket_open():
             raise ConnectionException
-    except ConnectionException:
+    except ConnectionException as ce:
+        logger.error(ce)
         print(f"Ошибка подключения. Возможно, порт {port} занят или недоступен.\n"
               f"Выход из программы...")
         time.sleep(2)
         sys.exit(1)
     except Exception as e:
-        print(f"Exception: {e}")
+        logger.error(e)
+        sys.exit(1)
     else:
         print("Устройство подключено\n")
         return client
@@ -62,4 +69,5 @@ def get_mb_client(device):
     ports = find_ports()
     bemp_port = select_port(ports)
     mb_client = get_connect(device, bemp_port)
+
     return mb_client
